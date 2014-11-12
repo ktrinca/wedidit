@@ -3,21 +3,21 @@
 #
 describe User do
 
-  describe '.send_technical_request_to' do
+  describe '#send_technical_request_to' do
     
     let(:user){ build(:registered_user) }
 
-    let(:admin){ build(:admin_user) }
+    let(:technical_request){ build(:technical_request) }
     
     it 'sends an email to the sysadmin' do
-      expect( user.send_technical_request_to(admin) ).to be true
+      expect( user.send_technical_request_to(technical_request) ).to be true
     end
 
     it 'sends the email using the mailer' do
       expect( UserMailer ).to receive ( :send_technical_request ).
                               with(technical_request)
 
-      user.send_technical_request_to(admin)
+      user.send_technical_request_to(technical_request)
     end   
 
   end
@@ -28,24 +28,24 @@ end
 describe UserMailer do
   describe '.send_technical_request' do
 
+    before do
+      @email = UserMailer.send_technical_request( technical_request )
+    end
+    
     it 'the email got queued' do
-      email = UserMailer.send_technical_request( technical_request )
       expect( ActionMailer::Base.deliveries ).not_to be_empty
     end
 
     it 'send the mail to the sys admin email' do
-      email = UserMailer.send_technical_request( technical_request )
-      expect( email.to ).to eq( ENV['ADMIN_EMAIL'] )
+      expect( @email.to ).to eq( ENV['ADMIN_EMAIL'] )
     end
 
     it 'send the email from the user email' do
-      email = UserMailer.send_technical_request( technical_request )
-      expect( email.to ).from eq( technical_request.user.email )
+      expect( @email.from ).to eq( technical_request.user.email )
     end
 
     it 'sets the right subject' do
-      email = UserMailer.send_technical_request( technical_request )
-      expect( email.subject ).to eq( technical_request.title )
+      expect( @email.subject ).to eq( technical_request.title )
     end  
   end
 end
@@ -53,20 +53,24 @@ end
 # spec/models/technical_request_spec.rb
 #
 describe TechnicalRequest do
-  describe '.after_create' do
+  describe '#after_create' do
 
+    let(:technical_request){ build(:technical_request) }
+    
     it 'sends the email to the admin' do
+      expect( UserMailer ).to receive ( :send_technical_request ).
+                                        with(technical_request)
+      
       technical_request = TechnicalRequest.create do |tr|
         tr.user        = user
         tr.description = 'The staging server is down'
       end
-
-      expect( UserMailer ).to receive ( :send_technical_request ).
-              with(technical_request)
     end  
   end  
 end  
 
+
+# spec/features/sending_technical_request_spec.rb
 
 def login
   visit new_user_session_path
@@ -80,10 +84,9 @@ def login
   expect(page).to have_content 'Success'
 end
 
-describe "send technical request", :type => feature do
+describe "sending technical request", :type => feature do
   it 'sends email technical request' do
     login
-
     visit new_technical_request_path
 
     within("#technical_request") do
@@ -92,7 +95,7 @@ describe "send technical request", :type => feature do
     end
     
     click_button 'create'
-    expect(page).to have_content 'Email technical request sent to #{ENV['ADMIN_EMAIL']}s'
+    expect(page).to have_content 'Email technical request sent to #{ENV['ADMIN_EMAIL']}'
   end
   
 end
